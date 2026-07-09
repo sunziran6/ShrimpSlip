@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(docker --version)",
+      "Bash(docker run *)",
+      "Bash(start \"\" \"C:\\\\Program Files\\\\Docker\\\\Docker\\\\Docker Desktop.exe\")",
+      "Bash(winget install *)",
+      "Bash(winget search *)",
+      "Read(//c/Program Files/Redis/**)",
+      "Bash(./redis-cli.exe ping *)",
+      "Bash(./redis-cli.exe shutdown *)",
+      "Bash(mysql *)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(where mysql *)",
+      "Bash(mvn clean *)",
+      "Bash(mvn -version)",
+      "Bash(curl *)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(npm install *)",
+      "Bash(nohup npm run dev --prefix /d/aaaaa/ShrimpSlip/shrimp-frontend)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe *)",
+      "Bash(taskkill //F //IM java.exe)",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -u root -p123456 shrimpslip -e \"SELECT code FROM sms_code WHERE phone='13900001111' ORDER BY created_at DESC LIMIT 1;\")",
+      "Bash(python3 -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'123456', bcrypt.gensalt\\(prefix=b'2a'\\)\\).decode\\(\\)\\)\")",
+      "Bash(python -c \"import bcrypt; print\\(bcrypt.hashpw\\(b'123456', bcrypt.gensalt\\(prefix=b'2a'\\)\\).decode\\(\\)\\)\")",
+      "Bash(pip install *)",
+      "Bash(\"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe\" -u root -p123456 shrimpslip -e \"SELECT id, phone, role FROM \\\\`user\\\\`;\")",
+      "Bash(git add *)"
+    ]
+  }
+}

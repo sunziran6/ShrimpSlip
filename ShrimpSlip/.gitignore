@@ -1,0 +1,52 @@
+# ====================================
+# Maven
+# ====================================
+target/
+*.class
+
+# ====================================
+# Node / Frontend
+# ====================================
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# ====================================
+# IDE
+# ====================================
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+*.swp
+*.swo
+*~
+
+# ====================================
+# OS
+# ====================================
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ====================================
+# Sensitive Config
+# ====================================
+*.env
+.env.*
+!*.env.example
+application-dev.yml
+application-prod.yml
+src/main/resources/application-dev.yml
+src/main/resources/application-prod.yml
+
+# ====================================
+# Temp
+# ====================================
+*.tmp
+*.bak
+*.orig

@@ -1,0 +1,2 @@
+ALTER TABLE `user` ADD COLUMN `password` VARCHAR(255) DEFAULT NULL COMMENT 'BCrypt hashed password' AFTER `phone`;
+ALTER TABLE `user` ADD COLUMN `role` VARCHAR(20) NOT NULL DEFAULT 'USER' COMMENT 'USER=普通用户 ADMIN=管理员' AFTER `status`;
