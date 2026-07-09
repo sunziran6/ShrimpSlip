@@ -3,12 +3,13 @@
 > 创建时间：2026-07-09
 > 所属服务：`shrimp-app/app-user`
 > 依赖：`common-core`、`common-security`
-> SQL：`scripts/sql/00-init-database.sql` `01-user.sql` `02-sms_code.sql` `03-address.sql` `04-add-password.sql`
+> SQL：`scripts/sql/00-init-database.sql` `01-user.sql` `02-sms_code.sql` `03-address.sql` `04-add-password-role.sql`
 
 ## 1. 模块职责
 
-- 手机号 + 验证码登录（可切换密码登录）
-- 用户注册（手机号 + 密码，昵称/头像可选）
+- 手机号 + 验证码登录 / 手机号 + 密码登录（前端可切换）
+- 用户注册（手机号 + 密码 + 昵称，均为必填）
+- 角色系统（USER / ADMIN，注册默认为 USER，管理员由数据库直接插入）
 - 微信 OAuth 授权登录（预留）
 - JWT Token 签发、刷新、注销
 - 用户基本信息管理（昵称、头像）
@@ -33,9 +34,10 @@ CREATE TABLE IF NOT EXISTS `user` (
     `id`            BIGINT       NOT NULL COMMENT '主键，雪花算法',
     `phone`         VARCHAR(20)  NOT NULL COMMENT '手机号',
     `password`      VARCHAR(255) DEFAULT NULL COMMENT 'BCrypt 加密密码',
-    `nickname`      VARCHAR(50)  DEFAULT NULL COMMENT '昵称',
+    `nickname`      VARCHAR(50)  NOT NULL COMMENT '昵称',
     `avatar`        VARCHAR(255) DEFAULT NULL COMMENT '头像URL',
     `status`        TINYINT      NOT NULL DEFAULT 1 COMMENT '0=禁用 1=正常',
+    `role`          VARCHAR(20)  NOT NULL DEFAULT 'USER' COMMENT 'USER=普通用户 ADMIN=管理员',
     `last_login_at` DATETIME     DEFAULT NULL COMMENT '最后登录时间',
     `created_at`    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     PRIMARY KEY (`id`),
@@ -43,7 +45,16 @@ CREATE TABLE IF NOT EXISTS `user` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
 ```
 
-### 2.3 短信验证码表 `sms_code`
+### 2.3 管理员初始化
+
+```sql
+-- 开发环境预置管理员（密码 123456，BCrypt 加密）
+-- 每次部署时由 DBA 手动插入或通过 SQL 脚本执行
+INSERT INTO `user` (`id`, `phone`, `password`, `nickname`, `status`, `role`, `created_at`)
+VALUES (1, '11111111', '$2a$12$...', '管理员', 1, 'ADMIN', NOW());
+```
+
+### 2.4 短信验证码表 `sms_code`
 
 ```sql
 USE shrimpslip;
@@ -62,7 +73,7 @@ CREATE TABLE IF NOT EXISTS `sms_code` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信验证码表';
 ```
 
-### 2.4 收货地址表 `address`
+### 2.5 收货地址表 `address`
 
 ```sql
 USE shrimpslip;
@@ -93,34 +104,84 @@ CREATE TABLE IF NOT EXISTS `address` (
 | POST | /api/user/refresh | 刷新 Token | Refresh Token |
 | GET | /api/user/profile | 获取个人信息 | JWT |
 | PUT | /api/user/profile | 修改个人信息 | JWT |
-| GET | /api/user/addresses | 收货地址列表 | JWT |
-| POST | /api/user/addresses | 新增地址 | JWT |
-| PUT | /api/user/addresses/{id} | 修改地址 | JWT |
-| DELETE | /api/user/addresses/{id} | 删除地址 | JWT |
 
-### 3.1 登录流程
+### 3.1 注册
 
-支持两种登录模式，前端可切换：
+```
+POST /api/user/register
+Content-Type: application/json
+
+{
+    "phone":    "13900001111",    // 必填，6-20 位数字
+    "password": "123456",         // 必填，最少 6 位
+    "nickname": "测试用户"         // 必填
+}
+
+Response 200:
+{
+    "code": 200,
+    "data": {
+        "accessToken":  "eyJ...",
+        "refreshToken": "eyJ...",
+        "userId": 2075169410042376193,
+        "nickname": "测试用户",
+        "avatar": null,
+        "role": "USER"             // 注册用户默认为 USER
+    }
+}
+```
+
+### 3.2 登录
+
+支持两种模式，前端可切换：
 
 | 模式 | 请求体 | 说明 |
 |------|--------|------|
-| 验证码登录 | `{phone, code}` | 先调用 `/send-code` 获取验证码，再登录 |
-| 密码登录 | `{phone, password}` | 直接输入密码登录 |
+| 验证码登录 | `{phone, code}` | 先调用 `/send-code` 获取验证码 |
+| 密码登录 | `{phone, password}` | BCrypt 比对密码 |
 
-**两种模式均要求用户已注册**（数据库中已存在），登录不会自动注册。
+**两种模式均要求用户已注册**，登录不会自动注册。
+
+```
+POST /api/user/login
+Content-Type: application/json
+
+// 密码登录
+{ "phone": "11111111", "password": "123456" }
+
+// 验证码登录
+{ "phone": "13900001111", "code": "366316" }
+
+Response 200:
+{
+    "code": 200,
+    "data": {
+        "accessToken":  "eyJ...",
+        "refreshToken": "eyJ...",
+        "userId": 1,
+        "nickname": "管理员",
+        "avatar": null,
+        "role": "ADMIN"            // 角色由数据库决定
+    }
+}
+```
+
+### 3.3 时序
 
 ```
 客户端                    网关                    app-user                  MySQL        Redis
   │                        │                       │                        │            │
   │ POST /api/user/register                        │                        │            │
-  │  {phone, password, nickname?} ─►──────────────►│                        │            │
+  │  {phone, password, nickname} ─►───────────────►│                        │            │
   │                        │                       │ 校验手机号唯一 ───────►│            │
+  │                        │                       │ 校验 nickname 必填       │            │
   │                        │                       │ BCrypt 加密密码         │            │
+  │                        │                       │ role = "USER"          │            │
   │                        │                       │ INSERT user ──────────►│            │
   │                        │                       │ 签发 JWT(Access+Refresh)│            │
-  │  {accessToken, refreshToken} ◄─────────────────│                        │            │
+  │  {accessToken, refreshToken, role} ◄───────────│                        │            │
   │                        │                       │                        │            │
-  │ ======= 验证码登录流程 =======                  │                        │            │
+  │ ======= 验证码登录 =======                       │                        │            │
   │                        │                       │                        │            │
   │ POST /api/user/send-code                       │                        │            │
   │  {phone} ─────────────►│──────────────────────►│                        │            │
@@ -134,27 +195,28 @@ CREATE TABLE IF NOT EXISTS `address` (
   │                        │                       │ 查 Redis 校验验证码 ──────────────►│
   │                        │                       │ 查 user 表（必须存在）───►│
   │                        │                       │ 签发 JWT(Access+Refresh)│            │
-  │  {accessToken, refreshToken} ◄─────────────────│                        │            │
+  │  {accessToken, refreshToken, role} ◄───────────│                        │            │
   │                        │                       │                        │            │
-  │ ======= 密码登录流程 =======                     │                        │            │
+  │ ======= 密码登录 =======                         │                        │            │
   │                        │                       │                        │            │
   │ POST /api/user/login   │                       │                        │            │
   │  {phone, password} ───►│──────────────────────►│                        │            │
   │                        │                       │ 查 user 表（必须存在）───►│
   │                        │                       │ BCrypt 比对密码          │            │
   │                        │                       │ 签发 JWT(Access+Refresh)│            │
-  │  {accessToken, refreshToken} ◄─────────────────│                        │            │
+  │  {accessToken, refreshToken, role} ◄───────────│                        │            │
 ```
 
-### 3.2 Token 策略
+### 3.4 Token 策略
 
 | 类型 | 存储位置 | 有效期 | 用途 |
 |------|----------|--------|------|
-| Access Token | 前端内存 | 2 小时 | 接口鉴权 |
-| Refresh Token | 前端 localStorage | 7 天 | 无感刷新 Access Token |
+| Access Token | localStorage | 2 小时 | 接口鉴权 |
+| Refresh Token | localStorage | 7 天 | 无感刷新 Access Token |
+| Role | localStorage | — | 前端区分普通用户/管理员 |
 
 - Access Token 过期 → 前端用 Refresh Token 调 `/refresh` 换新 Access Token
-- Refresh Token 也过期 → 重新登录
+- Refresh Token 过期 → 重新登录
 
 ## 4. 模块内部结构
 
@@ -163,32 +225,63 @@ app-user/
 ├── pom.xml
 └── src/main/
     ├── java/com/shrimpslip/app/user/
-    │   ├── UserApplication.java           # Spring Boot 启动类
+    │   ├── UserApplication.java
+    │   ├── config/
+    │   │   ├── SecurityConfig.java              # Spring Security + JWT 过滤器链
+    │   │   └── GlobalExceptionHandler.java       # 全局异常处理
     │   ├── controller/
-    │   │   └── UserController.java        # REST 接口
-    │   ├── service/
-    │   │   ├── UserService.java
-    │   │   ├── SmsService.java
-    │   │   └── AddressService.java
+    │   │   └── UserController.java               # REST 接口
+    │   ├── dto/
+    │   │   ├── LoginRequest.java                 # 登录请求（phone + password/code）
+    │   │   ├── LoginResponse.java                # 登录/注册响应（含 role）
+    │   │   ├── RegisterRequest.java              # 注册请求（phone + password + nickname）
+    │   │   └── SendCodeRequest.java              # 发送验证码请求
+    │   ├── entity/
+    │   │   ├── User.java                         # 用户实体
+    │   │   ├── SmsCode.java                      # 验证码实体
+    │   │   └── Address.java                      # 地址实体
     │   ├── mapper/
     │   │   ├── UserMapper.java
     │   │   ├── SmsCodeMapper.java
     │   │   └── AddressMapper.java
-    │   ├── model/
-    │   │   ├── entity/                    # DB 实体
-    │   │   ├── dto/                       # 请求/响应 DTO
-    │   │   └── vo/                        # 视图对象
-    │   └── config/
-    │       └── SecurityConfig.java         # Spring Security 配置
+    │   └── service/
+    │       ├── UserService.java
+    │       ├── SmsService.java
+    │       └── impl/
+    │           ├── UserServiceImpl.java          # 注册/登录/个人信息
+    │           └── SmsServiceImpl.java           # 验证码发送与校验
     └── resources/
-        ├── application.yml
-        └── db/
-            └── migration/                  # Flyway 迁移脚本
+        ├── application.yml                       # 主配置（环境变量占位符，可提交）
+        ├── application.yml.example               # 本地开发配置模板（可提交）
+        └── application-dev.yml                   # 本地开发真实配置（gitignored）
 ```
 
-## 5. Docker 部署方案
+## 5. 配置管理
 
-### 5.1 核心原理
+### 5.1 敏感信息保护
+
+| 文件 | Git | 说明 |
+|------|-----|------|
+| `application.yml` | 提交 | 使用 `${ENV_VAR:default}` 占位符，无真实密码 |
+| `application.yml.example` | 提交 | 模板文件，开发者复制后填入真实值 |
+| `application-dev.yml` | **不提交** | 真实开发环境密码，`.gitignore` 已忽略 |
+
+### 5.2 .gitignore 关键项
+
+```
+target/                         # Maven 构建产物
+node_modules/                   # NPM 依赖
+*.class                         # Java 编译文件
+application-dev.yml             # 敏感开发配置
+application-prod.yml            # 敏感生产配置
+.env*                           # 环境变量文件
+.idea/  *.iml  .vscode/        # IDE 配置
+.DS_Store  Thumbs.db            # 系统文件
+```
+
+## 6. Docker 部署方案
+
+### 6.1 核心原理
 
 容器之间通过 **Docker 网络** 互相通信。Docker Compose 会自动创建一个网络，每个服务名就是 DNS 主机名。
 
@@ -207,7 +300,7 @@ app-user/
 └─────────────────────────────────────────────┘
 ```
 
-### 5.2 docker-compose.yml
+### 6.2 docker-compose.yml
 
 ```yaml
 # ShrimpSlip/docker-compose.yml
@@ -223,8 +316,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - mysql-data:/var/lib/mysql               # 数据持久化
-      - ./scripts/sql:/docker-entrypoint-initdb.d  # 初始化 SQL
+      - mysql-data:/var/lib/mysql
+      - ./scripts/sql:/docker-entrypoint-initdb.d
     networks:
       - shrimp-net
     healthcheck:
@@ -250,11 +343,11 @@ services:
     ports:
       - "8081:8081"
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/shrimpslip?useSSL=false&allowPublicKeyRetrieval=true
-      SPRING_DATASOURCE_USERNAME: root
-      SPRING_DATASOURCE_PASSWORD: root123
-      SPRING_DATA_REDIS_HOST: redis
-      SPRING_PROFILES_ACTIVE: docker
+      MYSQL_URL: jdbc:mysql://mysql:3306/shrimpslip?useSSL=false&allowPublicKeyRetrieval=true
+      MYSQL_USERNAME: root
+      MYSQL_PASSWORD: root123
+      REDIS_HOST: redis
+      JWT_SECRET: change-me-in-production
     depends_on:
       mysql:
         condition: service_healthy
@@ -272,26 +365,9 @@ networks:
     driver: bridge
 ```
 
-### 5.3 application.yml（Docker 环境）
-
-```yaml
-# app-user/src/main/resources/application-docker.yml
-spring:
-  datasource:
-    url: ${SPRING_DATASOURCE_URL}       # 从环境变量读取
-    username: ${SPRING_DATASOURCE_USERNAME}
-    password: ${SPRING_DATASOURCE_PASSWORD}
-    driver-class-name: com.mysql.cj.jdbc.Driver
-  data:
-    redis:
-      host: ${SPRING_DATA_REDIS_HOST}   # 容器名，非 localhost
-      port: 6379
-```
-
-### 5.4 Dockerfile（每个 Spring Boot 服务）
+### 6.3 Dockerfile
 
 ```dockerfile
-# app-user/Dockerfile
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY target/app-user-*.jar app.jar
@@ -299,20 +375,21 @@ EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-### 5.5 关键点
+### 6.4 关键点
 
 | 问题 | 答案 |
 |------|------|
-| 为什么数据库地址写 `mysql` 而不是 `localhost`？ | Docker Compose 中每个服务名自动成为 DNS，`mysql` 就是 MySQL 容器的 IP |
+| 为什么数据库地址写 `mysql` 而不是 `localhost`？ | Docker Compose 中每个服务名自动成为 DNS |
 | 数据会丢吗？ | `volumes` 将数据存在宿主机，容器删了数据还在 |
-| 怎么初始化表？ | `./scripts/sql` 目录下的 `.sql` 文件会在 MySQL 首次启动时自动执行 |
-| 开发时怎么连？ | 开发时不用 Docker，直接连本机的 MySQL，`application-dev.yml` 配 `localhost:3306` |
-| 生产环境密码怎么处理？ | 用 Docker Secrets 或 K8s Secrets，不写在 compose 文件里 |
+| 怎么初始化表？ | `./scripts/sql` 下的 `.sql` 在 MySQL 首次启动时自动执行 |
+| 开发时怎么连？ | 开发时不用 Docker，`application-dev.yml` 配置 localhost |
+| 生产环境密码？ | 用 Docker Secrets 或 K8s Secrets，不写在 compose 文件里 |
 
-## 6. 安全设计
+## 7. 安全设计
 
 - 验证码发送频率限制：同一手机号 60s 内只能发 1 次（Redis 计数）
-- 登录失败限制：同一 IP 5 分钟内最多 10 次
+- 密码使用 BCrypt 加密存储，`PasswordEncoder` Bean 由 SecurityConfig 提供
 - Access Token 不存数据库，无状态校验
 - Refresh Token 签发时存 Redis，logout 时删除
-- 密码使用 BCrypt 加密存储，`PasswordEncoder` Bean 由 SecurityConfig 提供
+- 敏感配置文件 `application-dev.yml` / `application-prod.yml` 通过 `.gitignore` 排除
+- 管理员账号不通过注册接口创建，由 DBA 直接在数据库插入
