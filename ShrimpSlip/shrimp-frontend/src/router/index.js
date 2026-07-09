@@ -1,16 +1,11 @@
 import { createRouter, createWebHistory } from 'vue-router'
 
 const routes = [
-  { path: '/', redirect: '/login' },
+  { path: '/', redirect: '/auth' },
   {
-    path: '/login',
-    name: 'Login',
-    component: () => import('../views/LoginView.vue'),
-  },
-  {
-    path: '/register',
-    name: 'Register',
-    component: () => import('../views/RegisterView.vue'),
+    path: '/auth',
+    name: 'Auth',
+    component: () => import('../views/AuthView.vue'),
   },
   {
     path: '/home',
@@ -28,7 +23,7 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const token = localStorage.getItem('accessToken')
   if (to.meta.requiresAuth && !token) {
-    next('/login')
+    next('/auth')
   } else {
     next()
   }

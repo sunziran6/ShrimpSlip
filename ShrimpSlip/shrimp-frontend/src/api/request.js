@@ -26,7 +26,7 @@ request.interceptors.response.use(
     if (err.response?.status === 401) {
       localStorage.removeItem('accessToken')
       localStorage.removeItem('refreshToken')
-      window.location.href = '/login'
+      window.location.href = '/auth'
     }
     ElMessage.error('网络错误')
     return Promise.reject(err)

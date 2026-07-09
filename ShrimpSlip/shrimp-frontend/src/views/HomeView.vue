@@ -28,7 +28,7 @@ const router = useRouter()
 function handleLogout() {
   localStorage.removeItem('accessToken')
   localStorage.removeItem('refreshToken')
-  router.push('/login')
+  router.push('/auth')
 }
 </script>
 
