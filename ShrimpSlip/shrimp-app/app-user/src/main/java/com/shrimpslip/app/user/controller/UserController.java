@@ -83,4 +83,23 @@ public class UserController {
         userService.updateProfile(userId, body.get("nickname"), body.get("avatar"));
         return Result.ok();
     }
+
+    @PostMapping("/change-password")
+    public Result<Void> changePassword(@RequestBody Map<String, String> body) {
+        Long userId = UserContext.get();
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+        String confirmPassword = body.get("confirmPassword");
+        if (oldPassword == null || newPassword == null || confirmPassword == null) {
+            return Result.fail(400, "请填写所有密码字段");
+        }
+        if (!newPassword.equals(confirmPassword)) {
+            return Result.fail(400, "两次输入的新密码不一致");
+        }
+        if (newPassword.length() < 6) {
+            return Result.fail(400, "新密码至少6位");
+        }
+        userService.changePassword(userId, oldPassword, newPassword);
+        return Result.ok();
+    }
 }

@@ -86,4 +86,19 @@ public class UserServiceImpl implements UserService {
         user.setAvatar(avatar);
         userMapper.updateById(user);
     }
+
+    @Override
+    public void changePassword(Long userId, String oldPassword, String newPassword) {
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new BizException(404, "用户不存在");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
+            throw new BizException(400, "原密码错误");
+        }
+        User updateUser = new User();
+        updateUser.setId(userId);
+        updateUser.setPassword(passwordEncoder.encode(newPassword));
+        userMapper.updateById(updateUser);
+    }
 }

@@ -9,4 +9,5 @@ public interface UserService {
     LoginResponse register(RegisterRequest req);
     User getById(Long userId);
     void updateProfile(Long userId, String nickname, String avatar);
+    void changePassword(Long userId, String oldPassword, String newPassword);
 }

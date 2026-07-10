@@ -25,7 +25,7 @@
         <!-- Code row (login + code mode) -->
         <template v-if="mode === 'login' && loginMethod === 'code'">
           <el-form-item prop="code">
-            <div class="flex gap-3 w-full">
+            <div class="flex items-center gap-3 w-full">
               <el-input
                 v-model="form.code"
                 placeholder="验证码"
@@ -34,7 +34,7 @@
                 class="flex-1"
               />
               <el-button
-                class="!w-[130px] shrink-0"
+                class="!w-[130px] !h-[40px] shrink-0"
                 :disabled="countdown > 0"
                 @click="handleSendCode"
                 :loading="sending"
@@ -91,7 +91,7 @@
 
         <!-- Submit -->
         <el-form-item>
-          <el-button type="primary" class="w-full !h-[44px] !text-base" @click="handleSubmit" :loading="logging || loading">
+          <el-button native-type="button" type="primary" class="w-full !h-[44px] !text-base" @click="handleSubmit" :loading="logging || loading">
             {{ mode === 'login' ? '登 录' : '注 册' }}
           </el-button>
         </el-form-item>
@@ -127,7 +127,7 @@ import { sendCode, login, register } from '../../api/user'
 const router = useRouter()
 const formRef = ref(null)
 const mode = ref('login') // 'login' | 'register'
-const loginMethod = ref('code') // 'code' | 'password'
+const loginMethod = ref('password') // 'code' | 'password'
 const sending = ref(false)
 const logging = ref(false)
 const loading = ref(false)
@@ -239,9 +239,9 @@ async function handleSubmit() {
 
 async function handleLogin() {
   if (loginMethod.value === 'code') {
-    try { await formRef.value.validate(['phone', 'code']) } catch { return }
+    try { await formRef.value.validateField(['phone', 'code']) } catch { return }
   } else {
-    try { await formRef.value.validate(['phone', 'password']) } catch { return }
+    try { await formRef.value.validateField(['phone', 'password']) } catch { return }
   }
 
   logging.value = true
@@ -257,7 +257,12 @@ async function handleLogin() {
     localStorage.setItem('refreshToken', res.data.refreshToken)
     localStorage.setItem('role', res.data.role)
     ElMessage.success(`欢迎回来，${res.data.nickname}`)
-    router.push('/home')
+    const target = res.data.role === 'ADMIN' ? '/admin' : '/home'
+    await router.push(target)
+  } catch (err) {
+    if (err instanceof Error && err.message.includes('Navigation')) {
+      ElMessage.error('页面跳转失败，请刷新后重试')
+    }
   } finally {
     logging.value = false
   }
@@ -288,7 +293,8 @@ async function handleRegister() {
       if (successCountdown.value <= 0) {
         clearInterval(successTimer)
         successTimer = null
-        router.push('/home')
+        const target = res.data.role === 'ADMIN' ? '/admin' : '/home'
+        router.push(target)
       }
     }, 1000)
   } catch (err) {

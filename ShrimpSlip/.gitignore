@@ -50,3 +50,8 @@ src/main/resources/application-prod.yml
 *.tmp
 *.bak
 *.orig
+
+# ====================================
+# Uploaded Files
+# ====================================
+uploads/

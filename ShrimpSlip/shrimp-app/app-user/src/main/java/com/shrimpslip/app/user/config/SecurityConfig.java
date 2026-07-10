@@ -22,8 +22,10 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil) throws Exception {
-        List<String> publicPaths = List.of("/api/user/send-code", "/api/user/login",
-                "/api/user/refresh", "/api/user/register");
+        List<String> publicPaths = List.of(
+                "/api/user/send-code", "/api/user/login", "/api/user/refresh",
+                "/api/user/register",
+                "/api/products", "/api/products/", "/api/upload", "/uploads/");
 
         http
             .cors(cors -> cors.configurationSource(request -> {

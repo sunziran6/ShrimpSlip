@@ -23,3 +23,32 @@ export function getProfile() {
 export function updateProfile(data) {
   return request.put('/user/profile', data)
 }
+
+export function changePassword(data) {
+  return request.post('/user/change-password', data)
+}
+
+export function uploadFile(file) {
+  const formData = new FormData()
+  formData.append('file', file)
+  return request.post('/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+// Address
+export function getAddresses() {
+  return request.get('/user/addresses')
+}
+
+export function createAddress(data) {
+  return request.post('/user/addresses', data)
+}
+
+export function updateAddress(id, data) {
+  return request.put(`/user/addresses/${id}`, data)
+}
+
+export function deleteAddress(id) {
+  return request.delete(`/user/addresses/${id}`)
+}
